@@ -1,5 +1,5 @@
 {
-    "name": "@broadcast-socket-server",
+    "name": "broadcast-socket-server",
     "version": "1.0.0",
     "description": "Broadcast Socket Backend Server",
     "main": "dist/index.js",
