@@ -107,6 +107,8 @@ export function createSocketServer(config: ServerConfig) {
                 timestamp: Date.now(),
             });
 
+            console.log(`Proxy responded with ${JSON.stringify(proxyResponse)}`);
+
             // If proxy returns messages (array), send them back to this specific socket
             if (proxyResponse?.messages) {
                 console.log(`Proxy responded with ${proxyResponse.messages}`);
