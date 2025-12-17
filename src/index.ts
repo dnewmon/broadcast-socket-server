@@ -12,6 +12,8 @@ program
     .version("1.0.0")
     .option("-p, --port <number>", "Port to run the server on", "12000")
     .option("-c, --cors-origin <string>", "CORS origin", "http://localhost:5173")
+    .option("--proxy-url <string>", "HTTP proxy endpoint URL for bi-directional event forwarding")
+    .option("--proxy-token <string>", "Bearer token for proxy authentication")
     .parse(process.argv);
 
 const options = program.opts();
@@ -20,6 +22,14 @@ const config: ServerConfig = {
     port: parseInt(options.port, 10),
     corsOrigin: options.corsOrigin,
 };
+
+// Add proxy configuration if provided
+if (options.proxyUrl) {
+    config.proxy = {
+        url: options.proxyUrl,
+        bearerToken: options.proxyToken,
+    };
+}
 
 // Start the server
 createSocketServer(config);

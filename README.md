@@ -6,6 +6,7 @@ A lightweight WebSocket broadcast server with channel support, built on Socket.I
 
 - **Channel-based Broadcasting**: Organize clients into isolated channels for targeted message distribution
 - **HTTP Proxy Endpoint**: Send messages to channels via REST API without WebSocket connection
+- **Bi-directional HTTP Proxy**: Forward WebSocket events to an external HTTP endpoint and proxy responses back
 - **Health Check**: Built-in health monitoring endpoint
 - **CLI Support**: Run as a standalone server with command-line options
 - **Programmatic API**: Use as a library in your Node.js application
@@ -29,6 +30,12 @@ npx broadcast-socket-server
 
 # Custom port and CORS origin
 npx broadcast-socket-server --port 8080 --cors-origin "http://localhost:3000"
+
+# With HTTP proxy for bi-directional event forwarding
+npx broadcast-socket-server --proxy-url "http://localhost:3000/websocket-events"
+
+# With HTTP proxy and authentication
+npx broadcast-socket-server --proxy-url "http://localhost:3000/websocket-events" --proxy-token "your-secret-token"
 ```
 
 ### As a Library
@@ -38,9 +45,20 @@ Use the server programmatically in your Node.js application:
 ```typescript
 import { createSocketServer } from 'broadcast-socket-server';
 
+// Basic configuration
 const server = createSocketServer({
   port: 12000,
   corsOrigin: 'http://localhost:5173'
+});
+
+// With HTTP proxy for bi-directional event forwarding
+const serverWithProxy = createSocketServer({
+  port: 12000,
+  corsOrigin: 'http://localhost:5173',
+  proxy: {
+    url: 'http://localhost:3000/websocket-events',
+    bearerToken: 'your-secret-token' // Optional
+  }
 });
 
 console.log('Server started successfully');
@@ -133,6 +151,141 @@ await axios.post(
 );
 ```
 
+### Bi-directional HTTP Proxy
+
+Forward WebSocket events to an external HTTP endpoint and receive responses back. This allows you to manage WebSocket events through a simple REST API.
+
+#### Setting Up the Proxy
+
+Configure your server with a proxy URL:
+
+```typescript
+import { createSocketServer } from 'broadcast-socket-server';
+
+const server = createSocketServer({
+  port: 12000,
+  corsOrigin: 'http://localhost:5173',
+  proxy: {
+    url: 'http://localhost:3000/websocket-events',
+    bearerToken: 'your-secret-token' // Optional authentication
+  }
+});
+```
+
+#### Event Payload Structure
+
+The server POSTs events to your HTTP endpoint with this structure:
+
+```typescript
+interface ProxyEventPayload {
+  event: "connection" | "message" | "disconnect";
+  channel: string;
+  socketId: string;
+  timestamp: number;
+  data?: any; // Only present for "message" events
+}
+```
+
+#### Handling Events in Your HTTP Endpoint
+
+Create an endpoint to receive and process WebSocket events:
+
+```javascript
+// Express.js example
+app.post('/websocket-events', (req, res) => {
+  const { event, channel, socketId, timestamp, data } = req.body;
+
+  // Verify bearer token if configured
+  const authHeader = req.headers.authorization;
+  if (authHeader !== 'Bearer your-secret-token') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  switch (event) {
+    case 'connection':
+      console.log(`Client ${socketId} connected to ${channel}`);
+      // Return a welcome message to the connecting socket
+      return res.json({
+        message: {
+          data: { text: `Welcome! You are ${socketId}` },
+          timestamp: Date.now(),
+          sender: 'server'
+        }
+      });
+
+    case 'message':
+      console.log(`Message from ${socketId} in ${channel}:`, data);
+      // Process the message and send a response back
+      return res.json({
+        message: {
+          data: {
+            echo: data,
+            processedAt: Date.now()
+          },
+          timestamp: Date.now(),
+          sender: 'server'
+        }
+      });
+
+    case 'disconnect':
+      console.log(`Client ${socketId} disconnected from ${channel}`);
+      // No response needed for disconnect events
+      return res.json({});
+
+    default:
+      return res.status(400).json({ error: 'Unknown event type' });
+  }
+});
+```
+
+#### Response Format
+
+Your HTTP endpoint can optionally return a message to send back to the socket:
+
+```typescript
+interface ProxyEventResponse {
+  message?: {
+    data: any;              // Your response payload
+    timestamp: number;      // Unix timestamp
+    sender?: string;        // Identifier for the sender
+  }
+}
+```
+
+#### Behavior
+
+- **Connection Events**: Sent when a client connects. Response is sent only to the connecting socket.
+- **Message Events**: Sent when a client sends a message. Response is sent only to the socket that sent the message.
+- **Disconnect Events**: Sent when a client disconnects. No response expected (fire-and-forget).
+- **Fallback Mode**: If no proxy is configured, the server falls back to the default broadcast behavior.
+
+#### Example: Chat Bot Integration
+
+```javascript
+// Chat bot that responds to messages
+app.post('/websocket-events', async (req, res) => {
+  const { event, socketId, data } = req.body;
+
+  if (event === 'message' && data.text) {
+    // Process message with AI or bot logic
+    const botResponse = await processChatMessage(data.text);
+
+    return res.json({
+      message: {
+        data: {
+          text: botResponse,
+          bot: true
+        },
+        timestamp: Date.now(),
+        sender: 'bot'
+      }
+    });
+  }
+
+  res.json({});
+});
+```
+
 ### Server-Side Broadcasting
 
 Integrate with your backend to broadcast messages:
@@ -187,6 +340,8 @@ Options:
   -V, --version                 output the version number
   -p, --port <number>          Port to run the server on (default: "12000")
   -c, --cors-origin <string>   CORS origin (default: "http://localhost:5173")
+  --proxy-url <string>         HTTP proxy endpoint URL for bi-directional event forwarding
+  --proxy-token <string>       Bearer token for proxy authentication
   -h, --help                   display help for command
 ```
 
@@ -199,6 +354,9 @@ Creates and starts a new broadcast socket server.
 **Parameters:**
 - `config.port` (number): Port number for the server
 - `config.corsOrigin` (string): Allowed CORS origin
+- `config.proxy` (object, optional): HTTP proxy configuration
+  - `config.proxy.url` (string): HTTP endpoint URL to forward WebSocket events
+  - `config.proxy.bearerToken` (string, optional): Bearer token for authentication
 
 **Returns:**
 - `app`: Express application instance
