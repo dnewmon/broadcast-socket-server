@@ -117,9 +117,12 @@ export function createSocketServer(config: ServerConfig) {
                 console.log(`Proxy responded with ${proxyResponse.message}`);
                 // If proxy returns a single message, send it back to this specific socket
                 socket.emit("message", proxyResponse.message);
+            } else {
+                console.log(`Proxy didn't provide a response. Sending generic welcome message back.`);
+                console.log(JSON.stringify(proxyResponse));
             }
         } else {
-            console.log(`Proxy didn't provide a response. Sending generic welcome message back.`);
+            console.log(`No proxy configured. Sending generic welcome message back.`);
             // Fall back to default welcome message if no proxy configured
             const welcomeMessage: ChannelMessage = {
                 data: { text: `Welcome to channel: ${channel}` },
