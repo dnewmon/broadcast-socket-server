@@ -21,4 +21,5 @@ export interface ProxyEventPayload {
 }
 export interface ProxyEventResponse {
     message?: ChannelMessage;
+    messages?: ChannelMessage[];
 }
