@@ -61,6 +61,7 @@ function createSocketServer(config) {
             return res.status(400).json({ error: "Channel parameter is required" });
         }
         const message = req.body;
+        console.log(`Proxy payload: ${message}`);
         // Emit message to all sockets in the channel room
         io.to(channel).emit("message", message);
         res.json({
