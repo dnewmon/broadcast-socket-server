@@ -68,7 +68,6 @@ export function createSocketServer(config: ServerConfig) {
         }
 
         const message: ChannelMessage = req.body as ChannelMessage;
-        console.log(`Proxy payload: ${JSON.stringify(message)}`);
 
         // Emit message to all sockets in the channel room
         io.to(channel).emit("message", message);
@@ -103,8 +102,6 @@ export function createSocketServer(config: ServerConfig) {
                 socketId: socket.id,
                 timestamp: Date.now(),
             });
-
-            console.log(`Proxy responded with ${JSON.stringify(proxyResponse)}`);
 
             // If proxy returns messages (array), send them back to this specific socket
             if (proxyResponse?.messages) {
